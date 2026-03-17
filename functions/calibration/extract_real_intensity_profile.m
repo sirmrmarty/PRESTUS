@@ -72,16 +72,20 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
         % Interpolate the profiles with the weight alpha
         norm_profile_focus  = (1-alpha) * y1_interp_norm + alpha * y2_interp_norm;
 
-        % Map back to the original dist_from_exit_plane
-        x1_2_norm = x_common_norm + (alpha * x2_norm(idx2) + (1-alpha) * x1_norm(idx1));
+        % Map blended profile back to original dist_from_exit_plane space.
+        % The blended peak (at x_common_norm=0) must land at desired_focal_distance_ep.
+        % Weighted-average of the two bracketing peak positions gives the
+        % baseline mapping; the residual shift corrects for the fact that
+        % the blended peak may not sit at the weighted-average position.
+        [~, peak_idx_blended] = max(norm_profile_focus);
+        blended_peak_in_norm  = x_common_norm(peak_idx_blended);          % peak offset in normalised coords
+        baseline_offset       = (1-alpha) * dist_from_exit_plane(idx1) ... % weighted original peak positions
+                              +    alpha  * dist_from_exit_plane(idx2);
+        current_peak_pos      = blended_peak_in_norm + baseline_offset;    % where peak would land without correction
+        shift                 = desired_focal_distance_ep - current_peak_pos; % correction to hit target
+        x_final               = x_common_norm + baseline_offset + shift;
 
-        % Interpolate the final focused profile in the normalized space back to the original space
-        mapped_profile_focus = interp1(x_common_norm, norm_profile_focus, x1_2_norm, 'spline', 0);
-
-        % Calculate the offset (max_loc) to align the profile focus with dist_from_exit_plane
-        max_loc = abs(mean(x1_2_norm - dist_from_exit_plane'));
-
-        profile_focus = interp1(x1_2_norm + max_loc, mapped_profile_focus, dist_from_exit_plane, 'spline', 0);
+        profile_focus = interp1(x_final, norm_profile_focus, dist_from_exit_plane, 'spline', 0);
 
         % Plot the profiles and the interpolated result
         figure;
