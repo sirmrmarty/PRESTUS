@@ -22,7 +22,7 @@
     - [35, 83]
 
   # For curved transducers: are distances in empirical profiles provided from the exit plane?
-  add_FDO: 1   # Append Focal Distance Offset (distance from transducer bowl to exit plane). Use if zero point in provided profiles = exit plane, != transducer bowl.
+  add_FDO: 1  # Append Focal Distance Offset (distance from transducer bowl to exit plane). Use if zero point in provided profiles = exit plane, != transducer bowl.
 
   ## Parameters for calibration function
 

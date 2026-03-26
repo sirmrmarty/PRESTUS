@@ -86,7 +86,7 @@ function [norm_profile_focus, max_intens] = extract_real_intensity_profile(...
         x_final               = x_common_norm + baseline_offset + shift;
 
         profile_focus = interp1(x_final, norm_profile_focus, dist_from_exit_plane, 'spline', 0);
-
+        norm_profile_focus = profile_focus(:);
         % Plot the profiles and the interpolated result
         figure;
         plot(dist_from_exit_plane, profile_1, '-x', 'DisplayName', ...
