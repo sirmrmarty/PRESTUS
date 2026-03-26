@@ -85,9 +85,14 @@ switch parameters.code_type
          input_args.FunctionName = 'kspaceFirstOrder2D';
       end
 
-      gpu_id = str2double(getenv('SLURM_LOCALID'));
-      input_args.DeviceNum = gpu_id;
-      input_args.NumThreads = 1;
+        slurm_id = getenv('SLURM_LOCALID');
+        if isempty(slurm_id)
+            gpu_id = 0;  % default to first GPU on local machines
+        else
+            gpu_id = str2double(slurm_id);
+        end
+        input_args.DeviceNum = gpu_id;
+      % Note: NumThreads (-t) is only supported by the CPU binary, not CUDA
 
       input_args_cell = zip_fields(input_args);
       sensor_data = kspaceFirstOrder3DG(kgrid, medium, source, sensor, input_args_cell{:});

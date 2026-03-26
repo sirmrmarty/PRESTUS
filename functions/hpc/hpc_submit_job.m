@@ -54,7 +54,7 @@ function write_slurm_script(temp_slurm_path, parameters, subject_id, temp_m_file
         fprintf(fid, '#SBATCH --partition=%s\n', strtrim(char(parameters.hpc_partition)));
     elseif needs_gpu
         fprintf(fid, '#SBATCH --partition=gpu\n');
-        fprintf(fid, '#SBATCH --gres=gpu:1\n');
+        fprintf(fid, '#SBATCH --gpus=nvidia_a100_80gb_pcie:1\n');
     end
     
     if isfield(parameters, 'hpc_gpu') && ~isempty(strtrim(char(parameters.hpc_gpu)))

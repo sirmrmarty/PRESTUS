@@ -65,10 +65,10 @@ generate_report: 1        # Generate a self-contained HTML simulation report at 
 #   MATLAB GPU code 'matlab_gpu'
 #   C++ CPU code 'cpp_cpu'
 #   GPU code 'cpp_gpu'
-code_type: matlab_gpu 
+code_type: cpp_gpu 
 
 savemat: 0 # Save output matrices?
-debug: 1 # Activate a debug mode in which more intermediate outputs are provided?
+debug: 0 # Activate a debug mode in which more intermediate outputs are provided?
 
 #------------ High-performance computing
 
@@ -228,7 +228,7 @@ medium:
 
 #------------ Simulation grid
 
-grid_step_mm: 0.5  # Grid resolution (must be isotropic) [mm]
+grid_step_mm: 1  # Grid resolution (must be isotropic) [mm]
 default_grid_dims: [144, 144, 400] # [points per dimension] [used for setting up free-water grid]
 pml_size: 10 # Perfectly Matched Layer (PML) size [3D recommendation: 10]
 

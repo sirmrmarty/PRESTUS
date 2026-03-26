@@ -131,6 +131,11 @@ function simulation_nifti(parameters, planimg, results_acoustic, acoustic_isppa,
                     backtransf_coordinates = round(tformfwd(...
                         [tpos_sim; fpos_sim; highlighted_pos], ...
                         planimg.inv_transf));
+
+                    % Clamp coordinates to valid T1 grid bounds (avoid out-of-bounds error in makeBowl)
+                    t1_dims = size(planimg.t1_image_orig);
+                    backtransf_coordinates = max(backtransf_coordinates, 1);
+                    backtransf_coordinates = min(backtransf_coordinates, t1_dims(1:3));
             
                     % Creates a visual overlay of this transducer
                     [~, source_labels] = transducer_setup(...

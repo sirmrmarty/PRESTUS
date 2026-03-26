@@ -36,16 +36,33 @@ end
 fclose( fid );
 fn_out = [tempname,'.csv'];
 
-% include LD fix
-if isfield(parameters,'ld_library_path')
+% include LD fix (Unix only)
+if isfield(parameters,'ld_library_path') && ~ispc
     ld_command = sprintf('export LD_LIBRARY_PATH="%s"; ', parameters.ld_library_path);
 else
     ld_command = '';
 end
 
 % Run mni2subject_coords
-[status,result] = system(sprintf('%s%s/mni2subject_coords -m %s -s %s -o %s -t %s;', ...
-    ld_command, parameters.simnibs_bin_path, subdir, fn_in, fn_out, transformation_type));
+if ispc
+    % On Windows, activate conda env so MKL DLLs are on PATH
+    env_dir = fileparts(parameters.simnibs_bin_path);        % .../simnibs_env
+    envs_dir = fileparts(env_dir);                           % .../envs
+    conda_base = fileparts(envs_dir);                        % .../conda
+    activate_bat = fullfile(conda_base, 'condabin', 'activate.bat');
+    [~, env_name] = fileparts(env_dir);
+    if exist(activate_bat, 'file')
+        cmd = sprintf('call "%s" %s && mni2subject_coords -m "%s" -s "%s" -o "%s" -t %s', ...
+            activate_bat, env_name, subdir, fn_in, fn_out, transformation_type);
+    else
+        cmd = sprintf('"%s%smni2subject_coords" -m "%s" -s "%s" -o "%s" -t %s', ...
+            parameters.simnibs_bin_path, filesep, subdir, fn_in, fn_out, transformation_type);
+    end
+else
+    cmd = sprintf('%s%s/mni2subject_coords -m %s -s %s -o %s -t %s;', ...
+        ld_command, parameters.simnibs_bin_path, subdir, fn_in, fn_out, transformation_type);
+end
+[status,result] = system(cmd);
 
 
 % system([simnibs_cli_call('mni2subject_coords')...
