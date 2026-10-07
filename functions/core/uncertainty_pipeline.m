@@ -135,6 +135,10 @@ if ~isfield(options, 'report_memorylimit'); options.report_memorylimit  = []; en
 %
 %   simulation.interactive  Hardcoded to 0; HPC jobs cannot show dialogs.
 %
+%   hpc.scratch_cache   Hardcoded to 0: stages read each other's cache, so
+%                       it must stay on shared storage (k-Wave .h5 files
+%                       still use node-local scratch when hpc.tmp_gb > 0).
+%
 %   modules.*           All module flags are set explicitly by each builder —
 %                       this is the whole point of the pipeline, so user-set
 %                       module flags in the base parameters are ignored here.
@@ -661,6 +665,7 @@ function p = make_stage1_params(base)
 %
 % GPU is not required: no k-Wave simulation runs in this stage.
     p = clear_uncertainty_flag(base);
+    p.hpc.scratch_cache                = 0;   % cache is shared across stages
     p.modules.run_source_setup         = 1;
     p.modules.run_acoustic_sims        = 0;
     p.modules.run_heating_sims         = 0;
@@ -687,6 +692,7 @@ function p = make_sim_params(base, affix, medium_config)
 % run_source_setup = 1 is intentional: each variant checks for cached source
 % files from stage 1 and skips recomputation (overwrite_files = 'never').
     p = clear_uncertainty_flag(base);
+    p.hpc.scratch_cache = 0;   % cache is shared across stages
 
     if ~isempty(medium_config)
         if ~(ischar(medium_config) || isstring(medium_config)) || ~isfile(medium_config)
@@ -729,6 +735,7 @@ function p = make_report_params(base, affixes, log_files)
 % log_files is a struct with fields stage1, default, liberal, conservative,
 % report — pre-assigned paths that allow the report to parse per-stage timing.
     p = clear_uncertainty_flag(base);
+    p.hpc.scratch_cache              = 0;   % cache is shared across stages
     p.modules.run_source_setup       = 0;
     p.modules.run_acoustic_sims      = 0;
     p.modules.run_heating_sims       = 0;

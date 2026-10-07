@@ -69,7 +69,6 @@ function [trans_ras_seg, ...
     warp_info  = niftiinfo(warp_file);     % Contains the affine
     
     plan_affine = t1plan_info.Transform.T;
-    seg_affine = t1seg_info.Transform.T;
     warp_affine = warp_info.Transform.T;
     mni_affine = mni_info.Transform.T;
 
@@ -141,27 +140,36 @@ function [trans_ras_seg, ...
 
         targ_mni_mm = subject2mni_coords_LDfix(target_ras_seg(i,1:3), m2m_folder, parameters, transformation_type);
         trans_mni_mm = subject2mni_coords_LDfix(trans_ras_seg(i,1:3), m2m_folder, parameters, transformation_type);
+        % If the transducer falls outside the warp FOV (SimNIBS returns 0,0,0),
+        % step it 1 mm at a time towards the target along the beam axis. The
+        % direction is fixed once, so midline / vertex positions (|x| < 1 mm)
+        % converge instead of oscillating, and y/z misses are handled too.
         max_shift_iters = 20;
         shift_iters = 0;
-        orig_trans_x = trans_ras_seg(i,1);
+        orig_trans = trans_ras_seg(i,1:3);
+        if all(trans_mni_mm==0)
+            step = target_ras_seg(i,1:3) - orig_trans;
+            if norm(step) == 0
+                error('neuronav_convert_native_to_MNI:mniFitFailed', ...
+                    'Side %d: transducer and target coincide; cannot step into the MNI FOV.', i);
+            end
+            step = step / norm(step); % 1 mm (RAS mm) per iteration
+        end
         while all(trans_mni_mm==0)
             shift_iters = shift_iters + 1;
             if shift_iters > max_shift_iters
                 error('neuronav_convert_native_to_MNI:mniFitFailed', ...
                     ['Side %d: could not fit transducer position into MNI FOV after %d ' ...
-                     '1 mm shifts (starting x = %.1f).'], i, max_shift_iters, orig_trans_x);
+                     '1 mm steps towards the target (start [%.1f %.1f %.1f]).'], ...
+                    i, max_shift_iters, orig_trans);
             end
-            if trans_ras_seg(i,1) >= 0
-                trans_ras_seg(i,1) = trans_ras_seg(i,1)-1; % change the right-left location to fall within the frame
-            else
-                trans_ras_seg(i,1) = trans_ras_seg(i,1)+1;
-            end
+            trans_ras_seg(i,1:3) = trans_ras_seg(i,1:3) + step;
             trans_mni_mm = subject2mni_coords_LDfix(trans_ras_seg(i,1:3), m2m_folder, parameters, transformation_type);
         end
         if shift_iters > 0
             warn(['Side %d: MNI space too constrained for original segmentation-space ' ...
-                'location; shifted x by %d mm (%.1f -> %.1f) to fit.'], ...
-                i, shift_iters, orig_trans_x, trans_ras_seg(i,1));
+                'location; moved %d mm towards target ([%.1f %.1f %.1f] -> [%.1f %.1f %.1f]).'], ...
+                i, shift_iters, orig_trans, trans_ras_seg(i,1:3));
         end
         % alternative: try to transform manually with matrices
 %             targ_mni_mm  = neuronav_apply_deformation(target_ras_seg(1:3), warp_field, warp_affine);
@@ -178,7 +186,8 @@ function [trans_ras_seg, ...
         % depends on optional input side_order
 
         % individual image is RAS (standard): smaller values are left
-        % important: MNI is LAS (smaller values are right)
+        % important: the MNI template's voxel ARRAY is stored LAS (smaller
+        % voxel index = right); MNI world mm is RAS-like (negative x = left)
         if exist('side_order')
             if strcmp(side_order{i}, 'left')
                 trans_mni_pos(i,1) = max_voxel_mni(1);

@@ -49,6 +49,9 @@ relies on `final_tissues.nii.gz` and the SimNIBS coordinate transforms.
 
 The resolved `trans_pos` / `focus_pos` (T1 grid voxels) are written into every
 configured transducer, and a QC overlay (`plot_placement_t1_overlay`) is saved.
+The resulting bowl-to-focus distance is printed; if `transducer.focal_distance_bowl`
+is set and differs by more than 5 mm, a warning is issued, because the requested
+focus may then lie outside what the transducer can reach.
 Downstream simulation is unchanged.
 
 ## Notes & limitations

@@ -413,6 +413,9 @@ See [doc_backend.md](doc_backend.md) and [doc_hpc.md](doc_hpc.md).
 | `ld_library_path` | LD_LIBRARY path for SimNIBS installation. | `''` | Set if you see `undefined symbol` errors. e.g. `/opt/gcc/7.2.0/lib64` |
 | `job_prefix` | Prefix string for HPC job names. | `'PRESTUS'` | Overridden to `'TP'` for transducer positioning jobs. |
 | `max_wait_checks` | Maximum number of job status checks when `wait_for_job = true`. | `540` | At 1 check/20 s, `540` ≈ 3 hours. |
+| `tmp_gb` | Node-local scratch per SLURM job [GB], requested as `#SBATCH --tmp=<N>G`. `0` = off. | `50` | Inside a SLURM job, k-Wave `.h5` files (`cpp_cpu`/`cpp_gpu`) and `cache/` go to scratch. See [doc_hpc.md](doc_hpc.md#node-local-scratch). |
+| `scratch_dir` | Scratch root. | `'auto'` | `'auto'` = first existing of `$PRESTUS_SCRATCH` > `$SLURM_TMPDIR` > `/scratch/$USER/$SLURM_JOB_NAME` > `/scratch/$USER/$SLURM_JOB_ID`; else create `/scratch/$USER/$SLURM_JOB_NAME` if `/scratch/$USER` exists; else `$TMPDIR`. Or an explicit path (`$VAR`/`${VAR}` expanded, created if missing). See [doc_hpc.md](doc_hpc.md#where-scratch-lives). |
+| `scratch_cache` | Also put `cache/` on scratch? | `1` | Discarded at job end. Ignored (cache stays in `<output>/cache`) when `simulation.debug = 1` and in multi-stage pipelines. |
 
 ---
 

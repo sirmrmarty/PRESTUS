@@ -162,6 +162,10 @@ end
 %% Build parameter structs
 % =========================================================================
 
+% Combine/thermal jobs read the per-transducer acoustic cache, so it must stay
+% on shared storage (k-Wave .h5 files still use node-local scratch when hpc.tmp_gb > 0).
+parameters.hpc.scratch_cache = 0;
+
 p_acoustic = cell(1, N);
 for ti = 1:N
     p_acoustic{ti} = make_acoustic_params(parameters, ti, affix_per_t{ti});

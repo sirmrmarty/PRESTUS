@@ -23,4 +23,8 @@ if parameters.simulation.interactive
 end
 assert(matches(parameters.io.overwrite_files, ["always", "never"]), ...
     'overwrite_files must be "always" or "never" for %s jobs.', upper(hpc_type));
+if isfield(parameters, 'hpc') && isfield(parameters.hpc, 'tmp_gb')
+    assert(isnumeric(parameters.hpc.tmp_gb) && isscalar(parameters.hpc.tmp_gb) && ...
+        parameters.hpc.tmp_gb >= 0, 'hpc.tmp_gb must be a scalar >= 0 (GB of node-local scratch).');
+end
 end

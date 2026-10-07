@@ -91,6 +91,10 @@ function write_slurm_script(temp_slurm_path, parameters, temp_m_file, log_dir)
     end
 
     fprintf(fid, '#SBATCH --mem=%iG\n', parameters.hpc.memorylimit);
+    % Node-local scratch for k-Wave .h5 files and cache (see hpc_scratch_setup)
+    if isfield(parameters.hpc, 'tmp_gb') && parameters.hpc.tmp_gb > 0
+        fprintf(fid, '#SBATCH --tmp=%iG\n', parameters.hpc.tmp_gb);
+    end
     fprintf(fid, '#SBATCH --time=%s\n', parameters.hpc.timelimit);
     fprintf(fid, '#SBATCH --output=%s_slurm_output_%%j.log\n', subj_id_string);
     fprintf(fid, '#SBATCH --error=%s_slurm_error_%%j.log\n', subj_id_string);

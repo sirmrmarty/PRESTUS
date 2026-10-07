@@ -69,6 +69,10 @@ function [parameters] = prestus_pipeline(parameters, options)
     safe_addpath(fullfile(currentLoc, '..', 'functions'));
     [parameters] = path_log_setup(parameters, get_prestus_path);
 
+    % Node-local scratch for k-Wave .h5 files / cache (hpc.tmp_gb > 0 inside a
+    % scheduler job). scratch_cleanup removes it when this function exits.
+    [parameters, scratch_cleanup] = hpc_scratch_setup(parameters, options); %#ok<ASGLU>
+
     % ====================================================================
     %% TELEMETRY  (opt-in, fully anonymous)
     % ====================================================================

@@ -120,6 +120,8 @@ try
         if ~isempty(csv_path) && isfile(csv_path)
             try
                 d.csv = readtable(csv_path, 'VariableNamingRule', 'preserve');
+                d.csv = removevars(d.csv, intersect(report_hidden_columns(), ...
+                    d.csv.Properties.VariableNames));
             catch
                 d.csv = [];
             end

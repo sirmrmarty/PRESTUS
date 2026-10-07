@@ -81,7 +81,7 @@ switch parameters.simulation.code_type
       sensor  = cast_struct(sensor, parameters.simulation.precision);
 
       % Pathname for the input and output files (used only for non-interactive computations)
-      h5_dir = char(parameters.io.dir_cache);
+      h5_dir = get_h5_dir(parameters);
       input_args.SaveToDisk = char(fullfile(h5_dir, ...
          sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
          parameters.simulation.medium, parameters.io.output_affix)));
@@ -123,7 +123,7 @@ switch parameters.simulation.code_type
          sensor_data = kspaceFirstOrderAS(kgrid, medium, source, sensor, as_args_cast{:}, 'RadialSymmetry', 'WSWA-FFT');
       else
          % Pathname for the input and output files
-         h5_dir = char(parameters.io.dir_cache);
+         h5_dir = get_h5_dir(parameters);
          input_args.SaveToDisk = char(fullfile(h5_dir, ...
            sprintf('sub-%03d_%s_input%s.h5', parameters.subject_id, ...
            parameters.simulation.medium, parameters.io.output_affix)));
@@ -170,4 +170,14 @@ switch parameters.simulation.code_type
 
 end
 
+end
+
+function h5_dir = get_h5_dir(parameters)
+% k-Wave C++ .h5 files go to node-local scratch when hpc_scratch_setup set
+% io.dir_scratch, otherwise to the cache folder.
+if isfield(parameters.io, 'dir_scratch') && ~isempty(parameters.io.dir_scratch)
+    h5_dir = char(parameters.io.dir_scratch);
+else
+    h5_dir = char(parameters.io.dir_cache);
+end
 end

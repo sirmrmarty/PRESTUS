@@ -115,6 +115,10 @@ fprintf('╚══════════════════════�
 %% Build parameter structs
 % =========================================================================
 
+% Thermal jobs load the stage-1 acoustic cache, so it must stay on shared
+% storage (k-Wave .h5 files still use node-local scratch when hpc.tmp_gb > 0).
+parameters.hpc.scratch_cache = 0;
+
 base_affix = '';
 if isfield(parameters, 'io') && isfield(parameters.io, 'output_affix') && ...
         ~isempty(parameters.io.output_affix)

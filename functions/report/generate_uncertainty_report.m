@@ -52,6 +52,8 @@ try
         if isfile(csv_path)
             try
                 tables{v} = readtable(csv_path, 'VariableNamingRule', 'preserve');
+                tables{v} = removevars(tables{v}, intersect(report_hidden_columns(), ...
+                    tables{v}.Properties.VariableNames));
             catch
                 tables{v} = [];
             end
@@ -355,7 +357,7 @@ function html = build_acoustic_section(tables, variant_labels, variant_affixes, 
     % Summary range table
     if is_layered
         key_metrics = {'Isppa', 'Isppa_brain', 'Isppa_skull', 'Isppa_skin', ...
-                       'real_focal_distance_mm', 'MI_brain', 'MI_skull', 'MI_skin', 'MI_tc', ...
+                       'real_focal_distance_mm', 'MI_brain', 'MI_tc', ...
                        'Ipa_target', 'halfmax_ISPPA_volume_brain_mm3'};
     else
         key_metrics = {'Isppa', 'Isppa_after_exitplane', 'Psptp', 'Ptp_target', ...
@@ -598,7 +600,7 @@ end
 
 function tf = is_layered_limits(metric_names)
 % Heuristic: if any metric is tissue-specific, use layered limits.
-    layered_keys = {'MI_brain', 'MI_skull', 'MI_skin', 'MI_tc', ...
+    layered_keys = {'MI_brain', 'MI_tc', ...
                     'riseT_brain', 'CEM43_brain', 'maxT_brain', ...
                     'Isppa_brain', 'Isppa_skull', 'Isppa_skin'};
     tf = any(ismember(metric_names, layered_keys));

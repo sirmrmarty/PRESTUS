@@ -204,6 +204,9 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     sim_param.simulation.interactive = 0;
     sim_param.subject_id             = sim_id;
     sim_param.hpc.wait_for_job       = true;
+    % The results .mat is read back from <outputs_folder>/cache below, so the
+    % cache must stay on shared storage (.h5 files may still use scratch).
+    sim_param.hpc.scratch_cache      = 0;
 
     % Inject optimised phases for global search mode so the correction
     % simulation matches the analytical comparison in Stage 5.
@@ -407,14 +410,16 @@ function [opt_source_amp, opt_source_phase_deg, opt_source_phase_rad] = calibrat
     % calibration.  Remove them once all simulations are complete unless the
     % caller explicitly requested to keep them for debugging by setting
     % parameters.io.save_acoustic_matrices = 1 or save_matrices = 1.
+    % Best-effort: the results are already saved, so a folder that cannot be
+    % removed (e.g. NFS leftovers) only warns instead of failing the run.
     % =========================================================================
-    if ~isfield(parameters.io, 'save_acoustic_matrices') || ...
-            parameters.io.save_acoustic_matrices == 0 || ...
-            ~isfield(parameters.io, 'save_matrices') || ...
-            parameters.io.save_matrices == 0
+    keep_cache = (isfield(parameters.io, 'save_acoustic_matrices') && ...
+                  parameters.io.save_acoustic_matrices == 1) || ...
+                 (isfield(parameters.io, 'save_matrices') && ...
+                  parameters.io.save_matrices == 1);
+    if ~keep_cache
         cache_folder = fullfile(sim_param.io.outputs_folder, 'cache');
-        if isfolder(cache_folder)
-            rmdir(cache_folder, 's');
+        if isfolder(cache_folder) && safe_rmdir(cache_folder)
             disp(['Calibration cache removed: ', cache_folder]);
         end
     end

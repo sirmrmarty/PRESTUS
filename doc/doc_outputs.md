@@ -63,11 +63,11 @@ Water/free-field simulations additionally include `Psptp` (spatial peak temporal
 | `Psptp_brain` | Pa | Spatial peak temporal peak pressure within brain tissue |
 | `Psptp_skull` | Pa | Spatial peak temporal peak pressure within skull bone |
 | `Psptp_skin` | Pa | Spatial peak temporal peak pressure within skin |
-| `Psptp` | Pa | Global spatial peak temporal peak pressure across the entire grid (same column also written for water/free-field runs). Max pressure safety limit: 2 MPa |
+| `Psptp` | Pa | Global spatial peak temporal peak pressure across the entire grid (same column also written for water/free-field runs). Shown as an informational "Max pressure" metric in the report (ITRUSST defines no pressure limit) |
 | `Ptp_target` | Pa | Temporal peak pressure at the target coordinate |
 | `MI_brain` | — | Maximum mechanical index within brain tissue (GM + WM) |
-| `MI_skull` | — | Maximum mechanical index within skull bone |
-| `MI_skin` | — | Maximum mechanical index within skin |
+| `MI_skull` | — | Maximum mechanical index within skull bone (CSV only; not shown in the HTML reports) |
+| `MI_skin` | — | Maximum mechanical index within skin (CSV only; not shown in the HTML reports) |
 | `MI_tc` | — | **Transcranial MI** — maximum mechanical index across all intracranial voxels (WM, GM, CSF, blood; skull bone excluded). Primary safety metric for cavitation risk at the sonication target. ITRUSST limit: 1.9 |
 | `Ix_brain_vox`, `Iy_brain_vox`, `Iz_brain_vox` | voxels | Grid coordinates of peak IPA within brain |
 | `halfmax_ISPPA_volume_brain_mm3` | mm³ | Volume of the −6 dB focal region within brain (voxels where IPA ≥ 50 % of `Isppa_brain`) |
@@ -114,7 +114,6 @@ The HTML report flags each metric against the ITRUSST consensus non-significant 
 |---|---|
 | MI transcranial | 1.9 |
 | MI (free water) | 1.9 |
-| Max pressure | 2 MPa |
 | Temperature rise (a) | 2 °C |
 | Maximum temperature (b) | 39 °C |
 | CEM43 (brain) (c) | 2 min |
@@ -227,7 +226,7 @@ When several subjects are simulated under the same `simulation.medium` and `io.o
 group_<medium>_report<affix>.html         ← self-contained group HTML report
 group_plots/                              ← group-level box-plot images
     group_<medium>_intensity<affix>.png     Isppa / Ipa_target across subjects
-    group_<medium>_mi<affix>.png            Mechanical Index per tissue
+    group_<medium>_mi<affix>.png            Mechanical Index (MI_tc, MI_brain)
     group_<medium>_maxT<affix>.png          maximum temperature  (heating runs)
     group_<medium>_riseT<affix>.png         temperature rise     (heating runs)
     group_<medium>_cem43<affix>.png         CEM43 thermal dose   (heating runs)

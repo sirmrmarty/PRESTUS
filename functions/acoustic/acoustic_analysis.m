@@ -145,13 +145,22 @@ end
     % [3b] focal distance referenced to the geometric exit plane.
     % trans_pos sits at the bowl apex; the exit plane lies a "bowl depth" of
     % (curv_radius - dist_geom_ep) in front of it (see the after_exit_plane_mask
-    % construction above). EP->peak therefore subtracts that offset.
+    % construction above). The offset is axial, so EP->peak uses the peak's
+    % projection on the transducer axis (trans_pos -> focus_pos), which stays
+    % correct for off-axis peaks where the Euclidean distance would not.
     ep_offset_mm = NaN;
     if isfield(tr, tr.type) && isfield(tr.(tr.type), 'curv_radius_mm') ...
             && isfield(tr.(tr.type), 'dist_geom_ep_mm')
         ep_offset_mm = tr.(tr.type).curv_radius_mm - tr.(tr.type).dist_geom_ep_mm;
     end
-    ep_focal_distance_mm = real_focal_distance - ep_offset_mm; % exit plane -> peak [mm]
+    beam_axis = double(focus_pos(:)' - trans_pos(:)');
+    if norm(beam_axis) > 0
+        axial_peak_mm = dot(double(results.max_isppa_eplane_pos(:)' - trans_pos(:)'), ...
+            beam_axis / norm(beam_axis)) * parameters.grid.resolution_mm;
+    else
+        axial_peak_mm = real_focal_distance;
+    end
+    ep_focal_distance_mm = axial_peak_mm - ep_offset_mm; % exit plane -> peak, along the axis [mm]
 
     % [3c] cranial Thermal Index (IEC 62359), informational. The emitted-power
     % derivation is an explicit assumption isolated in compute_tic.m.
