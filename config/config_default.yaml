@@ -398,6 +398,8 @@ timing:
   post_ptri_dur: 0 # Post-PTRI steady-state duration [s]
   post_pt_timestep: 1 # Modelling time step following PT & PTRI [s]
   equal_step_duration: 0 # Equal step durations for on and off cycles? 1=yes, 0=no
+  ramp_shape: 'linear' # Pulse envelope ramp: 'linear' | 'tukey' | 'sigmoid' (ignored if ramp_dur = 0)
+  ramp_dur: 0          # Ramp duration per edge [s], inside PD (2*ramp_dur <= pd); 0 = rectangular pulse
 
 #------------ Thermal parameters
 

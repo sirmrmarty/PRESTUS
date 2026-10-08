@@ -1184,16 +1184,17 @@ end
 function html = build_debug_section(parameters, subject_id, medium, affix)
     html = '';
 
+    % path_log_setup/resolve_io_dirs name these io.dir_debug[_preproc|_medium]
     debug_dir_preproc = '';
     debug_dir_medium  = '';
-    if isfield(parameters.io, 'debug_dir_preproc')
+    if isfield(parameters.io, 'dir_debug_preproc')
         debug_dir_preproc = parameters.io.dir_debug_preproc;
-    elseif isfield(parameters.io, 'debug_dir')
+    elseif isfield(parameters.io, 'dir_debug')
         debug_dir_preproc = fullfile(parameters.io.dir_debug, 'preproc');
     end
-    if isfield(parameters.io, 'debug_dir_medium')
+    if isfield(parameters.io, 'dir_debug_medium')
         debug_dir_medium = parameters.io.dir_debug_medium;
-    elseif isfield(parameters.io, 'debug_dir')
+    elseif isfield(parameters.io, 'dir_debug')
         debug_dir_medium = fullfile(parameters.io.dir_debug, 'medium');
     end
     if isempty(debug_dir_preproc) || ~isfolder(debug_dir_preproc)
@@ -1321,7 +1322,7 @@ function html = build_pseudoCT_section(parameters)
     if isfield(parameters.io, 'output_affix')
         affix = parameters.io.output_affix;
     end
-    if isfield(parameters.io, 'debug_dir_medium')
+    if isfield(parameters.io, 'dir_debug_medium')
         debug_path = parameters.io.dir_debug_medium;
     else
         debug_path = fullfile(parameters.io.dir_output, 'debug', 'medium');

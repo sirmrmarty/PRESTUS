@@ -107,6 +107,7 @@ try
         datestr(now, 'yyyy-mm-dd HH:MM:SS'));
     html_parts{end+1} = '</footer>';
     html_parts{end+1} = html_utils.lightbox();
+    html_parts{end+1} = report_scripts.common();
     html_parts{end+1} = '</body>';
     html_parts{end+1} = '</html>';
 

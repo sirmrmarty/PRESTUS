@@ -26,6 +26,8 @@ function [tic_val, info] = compute_tic(parameters, transducer, Isppa_ref_Wcm2)
 %
 % DUTY CYCLE: pulse duty (timing.dc, or pd/pri) times pulse-train duty
 % (ptd/ptri) when both are defined; 1 (continuous) when nothing is defined.
+% A ramped pulse envelope (timing.ramp_dur > 0) further scales it by the
+% envelope energy factor ramp_eta from THERMAL_PARAMETERS.
 %
 % Use as:
 %   [tic_val, info] = compute_tic(parameters, parameters.transducer(1), results.Isppa)
@@ -94,6 +96,22 @@ function d_mm = local_aperture_mm(tr)
 end
 
 % ------------------------------------------------------------------------
+function eta = local_ramp_eta(p)
+% Energy factor of a ramped pulse envelope (integral(env^2)/pd), from
+% thermal_parameters so the envelope maths lives in one place. 1 when the
+% pulse is rectangular or the timing protocol is incomplete.
+    eta = 1;
+    if ~isfield(p, 'timing') || ~isfield(p.timing, 'ramp_dur') || ~(p.timing.ramp_dur > 0)
+        return
+    end
+    try
+        pt = thermal_parameters(p, true);
+        if isfinite(pt.ramp_eta), eta = pt.ramp_eta; end
+    catch
+    end
+end
+
+% ------------------------------------------------------------------------
 function dc = local_duty_cycle(p)
 % Time-average factor in [0,1]: pulse duty (dc, or pd/pri) times pulse-train
 % duty (ptd/ptri) from the same struct. Defaults to 1 (continuous) when no
@@ -111,7 +129,7 @@ function dc = local_duty_cycle(p)
         if isnan(pulse), continue; end
         train = local_ratio(s, 'ptd', 'ptri');
         if isnan(train), train = 1; end
-        dc = pulse * train;
+        dc = pulse * train * local_ramp_eta(p);
         return
     end
 end
