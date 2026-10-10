@@ -106,7 +106,7 @@ end
 % simulations.                                                      %
 %                                                                   %
 % For a detailed explanation on how to correctly configure your     %
-% thermal parameters, see doc_thermal_simulations.                  %
+% thermal parameters, see doc/doc_simulations-thermal.md.           %
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
 % Clear the sensor mask
@@ -349,36 +349,42 @@ for rep_i = 1:n_ptri_reps
     for pulse_i = 1:n_pulses_pt
         fprintf('  Pulse train %d/%d\n', pulse_i, n_pulses_pt);
         
-        % PULSE ON
-        thermal_diff_obj.Q = source.Q;
+        % PULSE ON — piecewise-constant segments [steps_n, step_dur, q_scale];
+        % a single unit segment for rectangular pulses, ramp sub-steps scaled
+        % by envelope^2 otherwise (see thermal_parameters).
+        seg = params_thermal.pt_on_segments;
         tmp_status = 'on';
 
-        if log_thermal_updates || is_first_thermal_step
-            thermal_diff_obj.takeTimeStep(params_thermal.pt_on_steps_n, params_thermal.pt_on_steps_dur);
-            if is_first_thermal_step && ~log_thermal_updates
-                fprintf('  [Subsequent k-Wave thermal outputs suppressed. Set parameters.thermal.log_thermal_updates=1 to enable.]\n');
+        for seg_i = 1:size(seg, 1)
+            thermal_diff_obj.Q = source.Q .* seg(seg_i, 3);
+
+            if log_thermal_updates || is_first_thermal_step
+                thermal_diff_obj.takeTimeStep(seg(seg_i, 1), seg(seg_i, 2));
+                if is_first_thermal_step && ~log_thermal_updates
+                    fprintf('  [Subsequent k-Wave thermal outputs suppressed. Set parameters.thermal.log_thermal_updates=1 to enable.]\n');
+                end
+                is_first_thermal_step = false;
+            else
+                evalc('thermal_diff_obj.takeTimeStep(seg(seg_i, 1), seg(seg_i, 2))');
             end
-            is_first_thermal_step = false;
-        else
-            evalc('thermal_diff_obj.takeTimeStep(params_thermal.pt_on_steps_n, params_thermal.pt_on_steps_dur)');
+
+            % CEM43 iso update — R uses T_max so that any voxel that has previously
+            % exceeded 43 °C permanently accumulates at R=0.5, even after cooling.
+            % Irreversible damage (T>=57 ever reached) is recorded as Inf. See doc_simulations-thermal.md.
+            tmp_obj.cem43_iso = tmp_obj.cem43_iso + seg(seg_i, 1)*seg(seg_i, 2) ./ 60 .* ...
+                (0 .* (thermal_diff_obj.T < 39 & T_max < 43) + ...
+                 0.25 .* (thermal_diff_obj.T >= 39 & thermal_diff_obj.T < 43 & T_max < 43) + ...
+                 0.5 .* (thermal_diff_obj.T >= 43 | T_max >= 43)).^(43 - thermal_diff_obj.T);
+            tmp_obj.cem43_iso(thermal_diff_obj.T >= 57 | T_max >= 57) = Inf;
         end
         if parameters.simulation.interactive && ishandle(h_thermal_fig)
             figure(h_thermal_fig); thermal_diff_obj.plotTemp; drawnow;
         end
 
-        % CEM43 iso update — R uses T_max so that any voxel that has previously
-        % exceeded 43 °C permanently accumulates at R=0.5, even after cooling.
-        % Irreversible damage (T>=57 ever reached) is recorded as Inf. See doc_simulations-thermal.md.
-        tmp_obj.cem43_iso = tmp_obj.cem43_iso + params_thermal.pt_on_steps_n*params_thermal.pt_on_steps_dur ./ 60 .* ...
-            (0 .* (thermal_diff_obj.T < 39 & T_max < 43) + ...
-             0.25 .* (thermal_diff_obj.T >= 39 & thermal_diff_obj.T < 43 & T_max < 43) + ...
-             0.5 .* (thermal_diff_obj.T >= 43 | T_max >= 43)).^(43 - thermal_diff_obj.T);
-        tmp_obj.cem43_iso(thermal_diff_obj.T >= 57 | T_max >= 57) = Inf;
-        
         % Record status
         time_status_seq = [time_status_seq, struct(...
-            'time', num2cell(max([time_status_seq(:).time]) + params_thermal.pt_on_steps_n*params_thermal.pt_on_steps_dur), ...
-            'step', num2cell(max([time_status_seq(:).step]) + params_thermal.pt_on_steps_n), ...
+            'time', num2cell(max([time_status_seq(:).time]) + sum(seg(:, 1) .* seg(:, 2))), ...
+            'step', num2cell(max([time_status_seq(:).step]) + sum(seg(:, 1))), ...
             'status', tmp_status, 'recorded', 1)];
         
         % Update focal / max

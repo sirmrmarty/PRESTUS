@@ -119,6 +119,14 @@ try
         html_parts{end+1} = html_utils.section_error('Simulation Summary', ME);
     end
 
+    % Sonication protocol & drive settings (open by default)
+    try
+        html_parts{end+1} = html_utils.collapsible('Sonication protocol & drive settings', ...
+            build_protocol_section(csv_table, parameters, subject_id, medium, affix), true, 'protocol');
+    catch ME
+        html_parts{end+1} = html_utils.section_error('Sonication protocol', ME);
+    end
+
     % Section 5: Configuration Summary (collapsed by default)
     try
         html_parts{end+1} = html_utils.collapsible('Configuration Summary', ...
@@ -587,13 +595,19 @@ function html = build_methods_boilerplate(parameters, is_layered)
                   parameters.modules.run_heating_sims;
 
     pd_val = NaN; pri_val = NaN; ptd_val = NaN; ptri_val = NaN;
-    if isfield(parameters, 'thermal')
-        th      = parameters.thermal;
-        pd_val  = safe_field(th, 'pd',   NaN);
-        pri_val = safe_field(th, 'pri',  NaN);
-        ptd_val = safe_field(th, 'ptd',  NaN);
-        ptri_val= safe_field(th, 'ptri', NaN);
+    ramp_dur = 0; ramp_shape = '';
+    if isfield(parameters, 'timing')
+        tm       = parameters.timing;
+        pd_val   = safe_field(tm, 'pd',   NaN);
+        pri_val  = safe_field(tm, 'pri',  NaN);
+        ptd_val  = safe_field(tm, 'ptd',  NaN);
+        ptri_val = safe_field(tm, 'ptri', NaN);
+        ramp_dur   = safe_field(tm, 'ramp_dur', 0);
+        ramp_shape = char(string(safe_field(tm, 'ramp_shape', '')));
     end
+    % Unset timing defaults to 0 in config_default.yaml: treat as missing
+    pd_val(pd_val <= 0) = NaN;  pri_val(pri_val <= 0) = NaN;
+    ptd_val(ptd_val <= 0) = NaN; ptri_val(ptri_val <= 0) = NaN;
     pd_ms   = fmt(pd_val  * 1e3, '%.3g', '?');
     pri_ms  = fmt(pri_val * 1e3, '%.3g', '?');
     prf_hz  = fmt(1 / pri_val,   '%.3g', '?');
@@ -702,6 +716,23 @@ function html = build_methods_boilerplate(parameters, is_layered)
             pd_ms, prf_hz, pri_ms, dc_str);
     else
         timing_prose = 'Pulse timing parameters were not fully specified.';
+    end
+
+    if ~strcmp(pd_ms, '?') && isnumeric(ramp_dur) && isscalar(ramp_dur) && ramp_dur > 0
+        ramp_eta = NaN;
+        try
+            pt = thermal_parameters(parameters, true);
+            ramp_eta = pt.ramp_eta;
+        catch
+        end
+        ramp_extra = '';
+        if isfinite(ramp_eta) && ~isnan(pri_val)
+            ramp_extra = sprintf([' (envelope energy factor &#951;&#8201;=&#8201;%.2f; ' ...
+                'effective duty cycle: %.1f&#37;)'], ramp_eta, pd_val / pri_val * ramp_eta * 100);
+        end
+        timing_prose = [timing_prose sprintf([' Each pulse had %s onset and offset ' ...
+            'ramps of %s&#8201;ms within the pulse duration%s.'], ...
+            html_utils.escape(ramp_shape), fmt(ramp_dur * 1e3, '%.3g', '?'), ramp_extra)];
     end
 
     if has_pulse_train
@@ -1000,21 +1031,200 @@ function html = build_config_summary(parameters)
         html = config_row(html, modules{i,2}, status);
     end
 
-    % Thermal protocol (if enabled)
-    if isfield(parameters, 'thermal') && isfield(parameters, 'modules') && any(safe_field(parameters.modules, 'run_heating_sims', 0))
-        th = parameters.thermal;
-        thermal_fields = {'pd', 'Pulse duration'; 'pri', 'Pulse repetition interval'; ...
-                          'ptd', 'Pulse train duration'; 'ptri', 'Pulse train rep. interval'; ...
-                          'ptrd', 'Pulse train rep. duration'; 'post_ptri_dur', 'Steady-state duration'};
-        for i = 1:size(thermal_fields, 1)
-            val = safe_field(th, thermal_fields{i,1}, NaN);
+    % Sonication timing (if thermal enabled); full detail in the Protocol section
+    if isfield(parameters, 'timing') && isfield(parameters, 'modules') && any(safe_field(parameters.modules, 'run_heating_sims', 0))
+        tm = parameters.timing;
+        timing_fields = {'pd', 'Pulse duration'; 'pri', 'Pulse repetition interval'; ...
+                         'ramp_dur', 'Ramp duration (per edge)'; ...
+                         'ptd', 'Pulse train duration'; 'ptri', 'Pulse train rep. interval'; ...
+                         'ptrd', 'Pulse train rep. duration'; 'post_ptri_dur', 'Steady-state duration'};
+        for i = 1:size(timing_fields, 1)
+            val = safe_field(tm, timing_fields{i,1}, NaN);
             if isnumeric(val) && isscalar(val) && ~isnan(val)
-                html = config_row(html, thermal_fields{i,2}, sprintf('%.3f s', val));
+                html = config_row(html, timing_fields{i,2}, sprintf('%.4g s', val));
             end
+        end
+        if safe_field(tm, 'ramp_dur', 0) > 0
+            html = config_row(html, 'Ramp shape', safe_field(tm, 'ramp_shape', ''));
         end
     end
 
     html = [html '</table>'];
+end
+
+function html = build_protocol_section(csv_table, parameters, subject_id, medium, affix)
+% Sonication protocol (timing, ramp, pulse counts), drive/source settings
+% and achieved exposure, so a report states exactly what was simulated.
+% Derived timing comes from THERMAL_PARAMETERS, i.e. the same code that
+% drives the thermal simulation.
+    eta = char(951);
+    tm  = safe_field(parameters, 'timing', struct());
+    pt  = [];
+    train_duty = 1;
+
+    % ---------------- Sonication timing ----------------
+    html = '<h3>Sonication timing</h3>';
+    pd = safe_field(tm, 'pd', 0);
+    if ~(isnumeric(pd) && isscalar(pd) && pd > 0)
+        html = [html '<p class="placeholder">No pulse timing configured ' ...
+            '(timing.pd = 0; only required for thermal simulations).</p>'];
+    else
+        try
+            pt = thermal_parameters(parameters, true);
+        catch ME
+            html = [html sprintf('<p class="note">Derived timing unavailable: %s</p>', ...
+                html_utils.escape(ME.message))];
+        end
+        html = [html '<table class="config-table">'];
+        if isempty(pt)
+            f = fieldnames(tm);
+            for i = 1:numel(f)
+                html = config_row(html, ['timing.' f{i}], value_str(tm.(f{i})));
+            end
+        else
+            if pt.ptri > 0, train_duty = min(1, pt.ptd / pt.ptri); end
+            n_pulses = pt.n_pulses_per_pt * pt.n_ptri_reps;
+            ramped   = pt.ramp_dur > 0;
+
+            html = config_row(html, 'Pulse duration (PD)', sprintf('%.4g ms', pt.pd * 1e3));
+            html = config_row(html, 'Pulse repetition interval (PRI)', sprintf('%.4g ms', pt.pri * 1e3));
+            html = config_row(html, 'Pulse repetition frequency (PRF)', sprintf('%.4g Hz', pt.prf));
+            html = config_row(html, 'Duty cycle (PD/PRI)', sprintf('%.4g %%', pt.dc * 100));
+            if ramped
+                html = config_row(html, 'Pulse ramp', sprintf('%s, %.4g ms per edge (within PD)', ...
+                    pt.ramp_shape, pt.ramp_dur * 1e3));
+                html = config_row(html, ['Ramp energy factor ' eta], sprintf('%.4f', pt.ramp_eta));
+                html = config_row(html, ['Effective duty cycle (DC' char(183) eta ')'], ...
+                    sprintf('%.4g %%', pt.dc_eff * 100));
+            else
+                html = config_row(html, 'Pulse ramp', 'none (rectangular pulse)');
+            end
+            html = config_row(html, 'Pulse train duration (PTD)', sprintf('%.4g s', pt.ptd));
+            html = config_row(html, 'Pulses per train', sprintf('%d', pt.n_pulses_per_pt));
+            html = config_row(html, 'Pulse train repetition interval (PTRI)', sprintf('%.4g s', pt.ptri));
+            html = config_row(html, 'Pulse train duty (PTD/PTRI)', sprintf('%.4g %%', train_duty * 100));
+            html = config_row(html, 'Pulse train repetition duration (PTRD)', sprintf('%.4g s', pt.ptrd));
+            html = config_row(html, 'Number of pulse trains', sprintf('%d', pt.n_ptri_reps));
+            html = config_row(html, 'Total pulses', sprintf('%d', n_pulses));
+            html = config_row(html, 'Total sonication on-time', sprintf('%.4g s', n_pulses * pt.pd));
+            if ramped
+                html = config_row(html, ['Energy-weighted on-time (' char(183) eta ')'], ...
+                    sprintf('%.4g s', n_pulses * pt.pd * pt.ramp_eta));
+            end
+            html = config_row(html, 'Post-sonication cool-off', sprintf('%.4g s', pt.post_ptri_dur));
+            html = config_row(html, 'Model time steps', sprintf( ...
+                'pt_timestep %.4g s, post_pt_timestep %.4g s, equal_step_duration %d', ...
+                pt.pt_dt, pt.post_pt_timestep, safe_field(tm, 'equal_step_duration', 0)));
+            n_fine   = pt.n_pulses_per_pt * (sum(pt.pt_on_segments(:,1)) + pt.pt_off_steps_n) * pt.n_ptri_reps;
+            n_coarse = pt.ptri_off_steps_n * pt.n_ptri_reps + pt.post_ptri_steps_n;
+            html = config_row(html, 'Simulated thermal steps', sprintf('%d fine + %d coarse', n_fine, n_coarse));
+        end
+        html = [html '</table>'];
+    end
+
+    % ---------------- Drive / source settings ----------------
+    html = [html '<h3>Drive / source settings</h3>'];
+    trs = safe_field(parameters, 'transducer', []);
+    target = [];
+    for t = 1:numel(trs)
+        td = trs(t);
+        html = [html '<table class="config-table">'];
+        if numel(trs) > 1
+            html = config_row(html, 'Transducer', sprintf('#%d', t));
+        end
+        td_name = safe_field(td, 'name', '');
+        if ischar(td_name) && ~isempty(td_name)
+            html = config_row(html, 'Name', td_name);
+        end
+        td_type = char(string(safe_field(td, 'type', '')));
+        html = config_row(html, 'Type', td_type);
+        html = config_row(html, 'Frequency', sprintf('%.4g kHz', safe_field(td, 'freq_hz', NaN) / 1e3));
+        g = struct();
+        if ~isempty(td_type) && isfield(td, td_type), g = td.(td_type); end
+        html = config_row(html, 'Elements', value_str(safe_field(g, 'elem_n', NaN)));
+        html = config_row(html, 'Curvature radius', [value_str(safe_field(g, 'curv_radius_mm', NaN)) ' mm']);
+        focal_ep   = safe_field(td, 'focal_distance_ep', []);
+        focal_bowl = safe_field(td, 'focal_distance_bowl', []);
+        if isnumeric(focal_ep) && ~isempty(focal_ep)
+            html = config_row(html, 'Focal setting (from exit plane)', [value_str(focal_ep) ' mm']);
+        end
+        if isnumeric(focal_bowl) && ~isempty(focal_bowl)
+            html = config_row(html, 'Focal setting (from bowl)', [value_str(focal_bowl) ' mm']);
+        end
+        html = config_row(html, 'Source amplitude per element', [value_str(safe_field(g, 'elem_amp', [])) ' Pa']);
+        phase_deg = safe_field(g, 'elem_phase_deg', []);
+        if isempty(phase_deg) && isfield(g, 'elem_phase_rad')
+            phase_deg = g.elem_phase_rad * 180 / pi;
+        end
+        html = config_row(html, 'Phase per element', [value_str(phase_deg) ' deg']);
+        td_target = safe_field(td, 'target_isppa_wcm2', []);
+        if isempty(td_target) && t == 1 && isfield(parameters, 'calibration')
+            td_target = safe_field(parameters.calibration, 'target_isppa_wcm2', []);
+        end
+        if isnumeric(td_target) && ~isempty(td_target) && any(isfinite(td_target))
+            html = config_row(html, 'Target free-water ISPPA', [value_str(td_target) ' W/cm²']);
+            if t == 1, target = td_target; end
+        end
+        html = [html '</table>'];
+    end
+    if ~isempty(target)
+        html = [html '<p class="note">The pressure field was rescaled to the target free-water ' ...
+            'ISPPA; the source amplitude above is the pre-scaling value.</p>'];
+    end
+
+    % ---------------- Achieved exposure ----------------
+    html = [html '<h3>Achieved exposure</h3><table class="config-table">'];
+    isppa = csv_value(csv_table, 'Isppa');
+    html = config_row(html, 'ISPPA (spatial peak)', unit_str(isppa, '%.4g', 'W/cm²'));
+    isppa_brain = csv_value(csv_table, 'Isppa_brain');
+    if ~isnan(isppa_brain)
+        html = config_row(html, 'ISPPA (brain)', unit_str(isppa_brain, '%.4g', 'W/cm²'));
+    end
+    if ~isempty(pt) && ~isnan(isppa)
+        html = config_row(html, ['ISPTA (derived: ISPPA' char(183) 'DC' char(183) eta ...
+            char(183) 'train duty)'], unit_str(isppa * pt.dc_eff * train_duty * 1e3, '%.4g', 'mW/cm²'));
+    end
+    if ~isempty(trs) && ~isnan(isppa)
+        try
+            [~, info] = compute_tic(parameters, trs(1), isppa);
+            html = config_row(html, 'Time-averaged acoustic power W0', unit_str(info.W0_mW, '%.4g', 'mW'));
+        catch
+        end
+    end
+    html = config_row(html, 'TIC', unit_str(csv_value(csv_table, 'TIC'), '%.4g', ''));
+    html = [html '</table>'];
+
+    % ---------------- Protocol diagram ----------------
+    img_dir = safe_field(safe_field(parameters, 'io', struct()), 'dir_img', '');
+    if ~isempty(img_dir)
+        img = html_utils.embed_image(fullfile(img_dir, sprintf('sub-%03d_%s_thermal_protocol%s.png', ...
+            subject_id, medium, affix)), 'Thermal protocol diagram', 'Thermal protocol diagram');
+        if ~isempty(img)
+            html = [html '<div class="image-grid">' img '</div>'];
+        end
+    end
+end
+
+function s = value_str(v)
+% Compact display of a config value: scalar, comma-separated vector, or text.
+    if isnumeric(v) || islogical(v)
+        if isempty(v) || all(isnan(double(v(:))))
+            s = 'N/A';
+        else
+            s = strjoin(arrayfun(@(x) sprintf('%.6g', x), double(v(:)'), 'UniformOutput', false), ', ');
+        end
+    else
+        s = char(string(v));
+    end
+end
+
+function s = unit_str(val, fmt, unit)
+% Format a scalar with unit, or N/A when not finite.
+    if isnumeric(val) && isscalar(val) && isfinite(val)
+        s = strtrim([sprintf(fmt, val) ' ' unit]);
+    else
+        s = 'N/A';
+    end
 end
 
 function html = build_positioning_section(parameters, subject_id, affix)
@@ -1121,8 +1331,8 @@ function html = build_thermal_section(csv_table, parameters, subject_id, medium,
 
     % CSV thermal columns with color coding
     if ~isempty(csv_table)
+        limits = get_risk_limits(is_layered);
         if is_layered
-            limits = get_risk_limits(is_layered);
             thermal_cols = get_thermal_columns();
         else
             thermal_cols = get_thermal_columns_water();
@@ -1484,10 +1694,7 @@ function html = build_toc(parameters, is_layered)
     try
         if isfield(parameters.io, 'filename_table') && isfile(parameters.io.filename_table)
             csv_table = readtable(parameters.io.filename_table, 'VariableNamingRule', 'preserve');
-            if is_layered
-                limits = get_risk_limits(is_layered);
-            else
-            end
+            limits = get_risk_limits(is_layered);
             metric_names = fieldnames(limits);
             for i = 1:length(metric_names)
                 name = metric_names{i};
@@ -1516,6 +1723,7 @@ function html = build_toc(parameters, is_layered)
         'header',      'Header';
         'methods',     'Methods';
         'summary',     'Summary';
+        'protocol',    'Protocol';
         'config',      'Config';
     };
     for i = 1:size(links, 1)

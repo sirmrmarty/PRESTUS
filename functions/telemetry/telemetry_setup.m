@@ -24,6 +24,14 @@ function telemetry_setup()
         return   % explicit decision already recorded
     end
 
+    % Non-interactive runs (matlab -batch, incl. HPC jobs) cannot answer the
+    % prompt: skip it without recording a decision, so nothing is sent.
+    if batchStartupOptionUsed
+        fprintf(['PRESTUS telemetry: no consent recorded and running non-interactively; ' ...
+            'no data will be sent. Use telemetry_set_consent(true/false) to decide.\n']);
+        return
+    end
+
     fprintf('\n========================================\n');
     fprintf('PRESTUS – TELEMETRY\n');
     fprintf('========================================\n');

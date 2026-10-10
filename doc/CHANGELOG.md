@@ -9,9 +9,11 @@ Notable changes to this project are documented here.
 Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, an expanded transducer library, and GUI updates for Placement, Multi-Transducer, and Calibration tabs. Several fixes improve reliability of the thermal, sequential, and NeuroNav workflows.
 
 #### Acoustic simulation
+- ⚠️ Node-local scratch is on by default for SLURM jobs. `hpc.tmp_gb: 50` requests `#SBATCH --tmp=50G`. k-Wave `.h5` files and `cache/` are written to scratch and removed at job end. With `simulation.debug = 1` the cache stays on shared storage. Cross-job cache reuse needs `hpc.scratch_cache: 0`; `hpc.tmp_gb: 0` turns the feature off. See [doc_hpc.md](doc_hpc.md#node-local-scratch)
 - Beam-axis-aligned FOV cropping reduces memory and compute for deep targets
 - Multi-transducer incoherent field assembly for independent-element arrays
 - External acoustic NIfTI can now be passed directly as input to the thermal pipeline
+- **Fixed:** the free-water baseline no longer re-runs in heating-only jobs (`run_acoustic_sims: 0` with a `target_isppa_wcm2`). Its result was always replaced by the provenance in the cached acoustic file.
 - ⚠️ **Fixed:** simulation end time (`t_end`) now derived from the minimum sound speed (soft tissue / water, ~1500 m/s) rather than the maximum (bone, ~2800 m/s); the previous behaviour truncated the simulation ~1.9× too early, causing an artefactual pressure drop before steady state was reached
 
 #### Thermal simulation
@@ -40,11 +42,18 @@ Adds defacing, an acoustic FOV crop, multi-transducer incoherent summation, an e
 - Post-job resource usage reported via SLURM `sacct`, including a CO₂e footprint estimate
 - ⚠️ **Fixed:** uncertainty pipeline CSV saved to correct path (no extra `tabular/` subdirectory)
 - New global `MI` (free-water mechanical index) and `Psptp` (global peak pressure, now also written for layered runs) output columns, for consistency across media
-- Safety dashboards (per-subject and group) now flag peak pressure against a 2 MPa non-significant-risk limit
+- Global peak pressure (`Psptp`, "Max pressure") is shown as an informational metric: ITRUSST defines no pressure limit (MI / MItc is the mechanical criterion), so it no longer drives the safety verdict
+- ⚠️ **Fixed:** per-subject Max pressure tile compared the MPa-scaled display value against a Pa limit, so it always rendered green with an empty meter and a "2e+06 MPa" limit label
+- `MI_skull` / `MI_skin` are no longer shown anywhere in the HTML reports (tiles, tables, verdicts, roster flags, JSON payloads); they remain in the per-subject CSV. The Mechanical Index box plot now shows `MI_tc` and `MI_brain`
 - Safety dashboards (per-subject and group) now show both `MI` (free water) and `MItc` (transcranial) tiles side by side instead of per-tissue `MI_brain`/`MI_skull`/`MI_skin` cards; whichever variant has no data for the report's medium renders grayed out
 - Reports redesigned with a light/dark "instrument" theme, a searchable configuration dump, a sortable subject roster, and client-side distribution/correlation charts
 - New `riseT37_brain`/`riseT37_skull`/`riseT37_skin` thermal metric (temperature rise from a fixed 37°C baseline, ITRUSST limit 2°C), alongside the existing baseline-relative `riseT_*` metric
 - Cranial Thermal Index (TIC, IEC 62359) computation extracted into its own `compute_tic` function
+- ⚠️ **Fixed:** TIC emitted power now comes from the source definition (`elem_amp²/(2ρc)` × element area) instead of focal Isppa × aperture, which overstated it by roughly the focusing gain; duty cycle now includes the pulse-train factor (`ptd/ptri`). The Isppa estimate remains as an upper-bound fallback when `elem_amp` is unset
+- `ep_focal_distance_mm` (EP-to-focus) now uses the peak's projection on the transducer axis, so it stays correct for off-axis peaks
+- ⚠️ **Fixed:** report in-page search and configuration filter inserted raw text as HTML (text containing `<` or `&` broke), and the filter skipped matching lines; analysis charts now handle negative values
+- ⚠️ **Fixed:** `neuronav_convert_native_to_MNI` MNI-FOV fit stepped only along x and oscillated for midline/vertex transducers (|x| < 1 mm); it now steps 1 mm towards the target along the beam axis
+- `placement.mode = 'mni'` prints the resulting bowl-to-focus distance and warns when it differs from `focal_distance_bowl` by more than 5 mm; no longer needs the Statistics Toolbox (`pdist2`)
 
 #### GUI
 - New Placement, Multi-Transducer, and Calibration tabs

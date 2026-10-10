@@ -34,7 +34,29 @@ In this scenario, you can model a single longer pulse train. Modeling a long PTR
 - `post_ptri_dur` | 0
 - `post_pt_timestep` | 1
 
-Heat dissipation continues beyond the final ultrasound pulse. To capture delayed heating, it is advised to run simulations until a steady-state has been reached. This can be specified via ```parameters.thermal.post_ptri_dur```. This acquires the corresponding duration following the end of the protocol. Time steps for the post-stimulation duration can be defined to be different from the time steps of the main simulation ```pt_timestep``` (by default they are equal, unless explicitly specified via ```parameters.thermal.post_pt_timestep```). Alternatively, for a continuous pulse train, a steady-state phase could be included as part of an extended PTR interval. The former option enables a steady-state phase also for protocols with PTRs.
+Heat dissipation continues beyond the final ultrasound pulse. To capture delayed heating, it is advised to run simulations until a steady-state has been reached. This can be specified via ```parameters.timing.post_ptri_dur```. This acquires the corresponding duration following the end of the protocol. Time steps for the post-stimulation duration can be defined to be different from the time steps of the main simulation ```pt_timestep``` (defined via ```parameters.timing.post_pt_timestep```). Alternatively, for a continuous pulse train, a steady-state phase could be included as part of an extended PTR interval. The former option enables a steady-state phase also for protocols with PTRs.
+
+### Pulse ramping
+
+Pulses can have ramped onsets and offsets, set with `timing.ramp_shape` (`'linear'`, `'tukey'` or `'sigmoid'`) and `timing.ramp_dur`.
+- `ramp_dur` is the duration of each edge, and the ramps lie **inside** PD (2·`ramp_dur` ≤ `pd`).
+- With `ramp_dur = 0` (the default) pulses are rectangular, as before.
+
+The acoustic simulation is unchanged. Millisecond ramps do not alter the continuous-wave steady-state pressure field.
+
+The heat source scales with pressure², so during a pulse it follows the envelope²: Q(t) = Q · env(t)².
+- The thermal simulation splits each pulse ON phase into piecewise-constant segments.
+- Each ramp edge uses 10 sub-steps, with Q scaled by the mean of env² over each sub-step.
+- The plateau runs in between at full Q.
+- Delivered energy is therefore exact for any shape. CEM43 (ISO) is accumulated per segment.
+- Temperature is still recorded once per ON phase.
+
+The envelope reduces the energy per pulse by the factor η = ∫env²dt / PD:
+- linear: η = 1 − 4·`ramp_dur`/(3·`pd`)
+- tukey (raised cosine): η = 1 − 5·`ramp_dur`/(4·`pd`)
+- sigmoid: computed numerically (logistic edge, steepness 10, rescaled to run from 0 to 1)
+
+`thermal_parameters` reports η as `ramp_eta` and the effective duty cycle as `dc_eff` = `dc`·η. The TIC source-power estimate (`compute_tic`) applies the same factor. The protocol plot shows the ramped envelope.
 
 ### Additional parameters
 

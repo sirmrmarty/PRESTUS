@@ -22,9 +22,11 @@ You can change your decision at any time:
 
 ### Non-interactive environments (HPC batch jobs)
 
-In non-interactive sessions PRESTUS cannot prompt for input. The full notice
-is printed to stdout (visible in job logs) on every run, but **no decision is
-recorded and no data is sent**. The message will reappear on every run until
+In non-interactive sessions (`matlab -batch`, which PRESTUS HPC jobs use) PRESTUS
+cannot prompt for input. A one-line notice is printed to stdout (visible in job
+logs) on every run, but **no decision is recorded and no data is sent**.
+You can also record a decision with `telemetry_set_consent(true)` or
+`telemetry_set_consent(false)`. The message will reappear on every run until
 you make an explicit decision.
 
 To opt in from an HPC environment, either:

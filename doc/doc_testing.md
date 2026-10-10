@@ -11,7 +11,7 @@ Unit tests cover pure, deterministic functions — no external tools, no file I/
 | File | Functions covered |
 |---|---|
 | `test_helper.m` | `round_if_integer`, `find_min_factor`, `get_crop_dims`, `masked_max_3d`, `charm_seg_labels`, `get_flhm_center_position`, `cast_struct`, `get_xyz_mesh`, `zip_fields`, `subset_fields` |
-| `test_thermal_parameters.m` | `thermal_parameters` — duty cycle, pulse counts, step discretisation, validation errors |
+| `test_thermal_parameters.m` | `thermal_parameters` — duty cycle, pulse counts, step discretisation, pulse ramp segments + energy factor, validation errors |
 | `test_transform.m` | `ras_to_grid`, axisymmetric round-trip size checks |
 | `test_load_parameters.m` | `load_parameters` — default keys, config merging, affix sanitisation |
 | `test_head_preprocessing.m` | `get_crop_dims`, `preproc_medium_mask`, `skull_fill_holes` on synthetic segmentation volumes |

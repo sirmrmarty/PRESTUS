@@ -49,6 +49,13 @@ end
 
 CYCLES_PER_PD = 10;
 
+% Pulse envelope (ramp) over t in [0, pd]; rectangular if not defined
+if isfield(params_thermal, 'ramp_env')
+    ramp_env = params_thermal.ramp_env;
+else
+    ramp_env = @(t) ones(size(t));
+end
+
 function [t_high, signal_high] = generate_segment(t_start, total_duration, dt_coarse, is_on, upsample)
     n_steps = round(total_duration / dt_coarse);
     dt_high = total_duration / (n_steps * upsample);
@@ -62,7 +69,7 @@ function [t_high, signal_high] = generate_segment(t_start, total_duration, dt_co
         t_abs_step = t_start + t_local + t_rel_step;
         if is_on
             phase = 2*pi * CYCLES_PER_PD * (t_local + t_rel_step) / total_duration;
-            signal_step = sin(phase);
+            signal_step = sin(phase) .* ramp_env(t_local + t_rel_step);
         else
             signal_step = zeros(size(t_rel_step));
         end
@@ -141,7 +148,11 @@ subplot(2,1,1);
         end
     end
     
-    title(sprintf('Pulse Detail: PRI=%.1fms'), 'FontSize', 13);
+    pulse_title = sprintf('Pulse Detail: PD=%.1fms, PRI=%.1fms', params_thermal.pd*1e3, params_thermal.pri*1e3);
+    if isfield(params_thermal, 'ramp_dur') && params_thermal.ramp_dur > 0
+        pulse_title = sprintf('%s, %s ramp %.1fms/edge', pulse_title, params_thermal.ramp_shape, params_thermal.ramp_dur*1e3);
+    end
+    title(pulse_title, 'FontSize', 13);
     ylabel('Signal'); grid on; ylim([-1.2 1.2]);
     legend(h1, 'US Pulse', 'Location', 'southeast');
 
